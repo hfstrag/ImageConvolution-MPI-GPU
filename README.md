@@ -31,6 +31,13 @@ communications, and GPU computation.
 The programs read 8-bit Sun Raster images with a standard RGB color map. The
 images provided in `images/` are examples.
 
+## License
+
+The project source code and documentation are licensed under the MIT License;
+see [LICENSE](LICENSE) for details. This license does not automatically apply
+to the sample images or third-party materials. Check their respective
+ownership and terms before redistributing them.
+
 ## Building
 
 From the project root:
