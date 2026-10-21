@@ -2,6 +2,7 @@
 *.o
 *.obj
 *.out
+*.exe
 parallel_blocking
 parallelnon_blocking
 gpu_convol_v0
@@ -18,6 +19,10 @@ gpu_convol_v0
 post-convolution_*.ras
 MPI_parallelization/results/
 GPU_parallelization/results/
+tests/test_convo.exe
+figures/
+__pycache__/
+*.py[cod]
 
 # IDE and operating-system files
 .vscode/

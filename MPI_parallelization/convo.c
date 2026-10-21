@@ -9,6 +9,8 @@
 #include <math.h>   /* for rint() */
 #include <string.h> /* for memcpy() */
 #include <sys/time.h>   /* for timing */
+#include <errno.h>
+#include <limits.h>
 
 #include "rasterfile.h"
 
@@ -68,7 +70,6 @@ void swap(int *i) {
 
 void read_rasterfile(char *name, Raster *r) {
   FILE *f;
-  int i;
     
   if( (f=fopen(name, "r"))==NULL) {
     fprintf(stderr,"Error when reading the file %s\n", name);
@@ -109,7 +110,6 @@ void read_rasterfile(char *name, Raster *r) {
 
 void save_rasterfile(char *name, Raster *r)     {
   FILE *f;
-  int i;
   
   if( (f=fopen( name, "w"))==NULL) {
     fprintf(stderr,"Error when writing the file %s\n", name);
@@ -162,6 +162,27 @@ typedef enum {
   CONVOL_STEP,       ///< max gradient
   CONVOL_MEDIAN  ///< median filter 
 } filter_t;
+
+static int parse_nonnegative_int(const char *text, int *value) {
+  char *end;
+  long parsed;
+
+  if (text == NULL || text[0] == '\0' || value == NULL) return 0;
+
+  errno = 0;
+  parsed = strtol(text, &end, 10);
+  if (errno == ERANGE || end == text || *end != '\0' ||
+      parsed < 0 || parsed > INT_MAX) {
+    return 0;
+  }
+
+  *value = (int)parsed;
+  return 1;
+}
+
+static int parse_filter_arg(const char *text, int *value) {
+  return parse_nonnegative_int(text, value) && *value <= CONVOL_MEDIAN;
+}
 
 /**
  * Performs a convolution operation with a predefined kernel on a single point.
@@ -262,7 +283,8 @@ int convolution( filter_t choice, unsigned char tab[], int nbl, int nbc) {
   } /* for i */
   
   /* Freeing the memory of the intermediate buffer: */
-  free(tmp);   
+  free(tmp);
+  return 0;
 }
 
 

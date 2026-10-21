@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes openmpi-bin libopenmpi-dev
+      - name: Run CPU unit tests
+        run: make test
+      - name: Run MPI integration tests
+        run: make test-mpi

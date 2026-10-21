@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
 
   /* Loop variables */
   int 	i;
+  int    local_ok;
 
 
   /* Initialization */
@@ -44,8 +45,15 @@ int main(int argc, char *argv[]) {
   }
 
   /* Parameter entry */
-  filter = atoi(argv[2]);
-  nbiter = atoi(argv[3]);
+  if (!parse_filter_arg(argv[2], &filter) ||
+      !parse_nonnegative_int(argv[3], &nbiter)) {
+    if (my_rank == 0) {
+      fprintf(stderr, "Error: filter must be 0-4 and nbiter a non-negative integer.\n");
+      fprintf(stderr, usage, argv[0]);
+    }
+    MPI_Finalize();
+    return 1;
+  }
 
   /* Reading the Raster file */
   if (my_rank == 0) {
@@ -67,6 +75,20 @@ int main(int argc, char *argv[]) {
   local  = malloc(nbl * w);
   top    = malloc(3 * w);
   bottom = malloc(3 * w);
+  local_ok = local != NULL && top != NULL && bottom != NULL;
+  {
+    int all_ok;
+    MPI_Allreduce(&local_ok, &all_ok, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!all_ok) {
+      if (my_rank == 0) fprintf(stderr, "Error: unable to allocate MPI image buffers.\n");
+      free(local);
+      free(top);
+      free(bottom);
+      if (my_rank == 0) free(r.data);
+      MPI_Finalize();
+      return 1;
+    }
+  }
 
   up   = (my_rank == 0)     ? MPI_PROC_NULL : my_rank - 1;
   down = (my_rank == p - 1) ? MPI_PROC_NULL : my_rank + 1;

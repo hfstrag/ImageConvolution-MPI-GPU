@@ -7,8 +7,10 @@
 #  Tools                                                             #
 # ------------------------------------------------------------------ #
 MPICC   = mpicc
+TEST_CC ?= gcc
 CFLAGS  = -O3 -Wall -march=native -mtune=native -ffast-math
 LIBS    = -lm
+TEST_BIN = ../tests/test_convo.exe
 
 # ------------------------------------------------------------------ #
 #  Binaries                                                          #
@@ -31,7 +33,7 @@ MPIRUN     = mpirun --mca pml ^ucx -machinefile $$OAR_NODEFILE
 # ------------------------------------------------------------------ #
 #  Compilation                                                       #
 # ------------------------------------------------------------------ #
-.PHONY: all clean bench bench_p bench_iter parse plot
+.PHONY: all clean bench bench_p bench_iter parse plot test-cpu
 
 all: $(BIN_BLO) $(BIN_NONBLO)
 
@@ -40,6 +42,12 @@ $(BIN_BLO): parallel_blocking.c convo.c rasterfile.h
 
 $(BIN_NONBLO): parallelnon_blocking.c convo.c rasterfile.h
 	$(MPICC) $(CFLAGS) -o $@ parallelnon_blocking.c $(LIBS)
+
+test-cpu: $(TEST_BIN)
+	$(TEST_BIN)
+
+$(TEST_BIN): ../tests/test_convo.c convo.c rasterfile.h
+	$(TEST_CC) -O2 -std=gnu99 -Wall -Wextra -o $@ ../tests/test_convo.c $(LIBS)
 
 # ------------------------------------------------------------------ #
 #  Result directory                                                  #
@@ -125,5 +133,5 @@ parse: $(RESDIR)
 #  clean                                                             #
 # ------------------------------------------------------------------ #
 clean:
-	rm -f $(BIN_BLO) $(BIN_NONBLO) post-convolution_*.ras
+	rm -f $(BIN_BLO) $(BIN_NONBLO) $(TEST_BIN) post-convolution_*.ras
 	rm -rf $(RESDIR) fig*.pdf fig*.png

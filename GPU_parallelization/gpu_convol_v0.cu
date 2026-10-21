@@ -14,6 +14,8 @@
 #include <sys/types.h> /* for getpwuid() */
 #include <pwd.h>       /* for getpwuid() */
 #include <stdbool.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "rasterfile.h"
 
@@ -422,6 +424,24 @@ unsigned char *gpu_multiple_convolutions(unsigned char buf[],
 
 static char usage[] = "Usage : %s <SunRaster image name> <nbiter> [<blockDim_x>] [<blockDim_y>]\n";
 
+static bool parse_nonnegative_int(const char *text, int *value)
+{
+  char *end;
+  long parsed;
+
+  if (text == NULL || text[0] == '\0' || value == NULL)
+    return false;
+
+  errno = 0;
+  parsed = strtol(text, &end, 10);
+  if (errno == ERANGE || end == text || *end != '\0' ||
+      parsed < 0 || parsed > INT_MAX)
+    return false;
+
+  *value = (int)parsed;
+  return true;
+}
+
 /*
  * Main part
  */
@@ -433,9 +453,9 @@ int main(int argc, char *argv[])
   Raster r;
   int w, h; /* number of lines and columns of the image */
   struct passwd *pass;
-  char output_name[128] = "";
-  char *base_name = basename(argv[1]);
-  char dir_name[32] = "";
+  char output_name[PATH_MAX];
+  char dir_name[PATH_MAX];
+  char *base_name;
 
   /* Variables related to the image processing */
   int nbiter; /* number of iterations */
@@ -449,40 +469,71 @@ int main(int argc, char *argv[])
 
   /* GPU block dimensions: */
   int blockDim_x = 16, blockDim_y = 16;
+  cudaDeviceProp device_properties;
+  bool results_match = true;
 
-  if (argc < 3)
+  if (argc < 3 || argc > 5)
   {
     fprintf(stderr, usage, argv[0]);
     return 1;
   }
 
   /* Parameter entry */
-  nbiter = atoi(argv[2]);
-  if (argc > 3)
-    blockDim_x = atoi(argv[3]);
-  if (argc > 4)
-    blockDim_y = atoi(argv[4]);
+  if (!parse_nonnegative_int(argv[2], &nbiter) ||
+      (argc > 3 && !parse_nonnegative_int(argv[3], &blockDim_x)) ||
+      (argc > 4 && !parse_nonnegative_int(argv[4], &blockDim_y)) ||
+      blockDim_x == 0 || blockDim_y == 0)
+  {
+    fprintf(stderr, "Error: iteration count must be non-negative and block dimensions must be positive integers.\n");
+    fprintf(stderr, usage, argv[0]);
+    return 1;
+  }
 
   /* Reading the Raster file */
   read_rasterfile(argv[1], &r);
   h = r.file.ras_height;
   w = r.file.ras_width;
+  base_name = basename(argv[1]);
   printf("Image %s : %dx%d\n", argv[1], h, w);
   printf("Blocks : %dx%d \tnbiter : %d\n", blockDim_x, blockDim_y, nbiter);
 
+  CUDA_ERROR(cudaGetDeviceProperties(&device_properties, 0));
+  if (blockDim_x > device_properties.maxThreadsDim[0] ||
+      blockDim_y > device_properties.maxThreadsDim[1] ||
+      (long long)blockDim_x * blockDim_y > device_properties.maxThreadsPerBlock)
+  {
+    fprintf(stderr, "Error: block dimensions exceed the limits of the selected CUDA device.\n");
+    free(r.data);
+    return 1;
+  }
+
   /* Preparing the final save: */
   pass = getpwuid(getuid());
-  sprintf(dir_name, "/tmp/%s", pass->pw_name);
-  // printf("dir_name = %s\n", dir_name);
-  mkdir(dir_name, S_IRWXU);
-  sprintf(output_name, "%s/post-convolution_%s", dir_name, base_name);
-  // printf("output_name = %s\n", output_name);
+  if (pass == NULL ||
+      snprintf(dir_name, sizeof(dir_name), "/tmp/%s", pass->pw_name) >= (int)sizeof(dir_name) ||
+      (mkdir(dir_name, S_IRWXU) != 0 && errno != EEXIST) ||
+      snprintf(output_name, sizeof(output_name), "%s/post-convolution_%s", dir_name, base_name) >= (int)sizeof(output_name))
+  {
+    fprintf(stderr, "Error: unable to prepare the output path.\n");
+    free(r.data);
+    return 1;
+  }
 
   /* Memory allocation: */
   buf = (unsigned char *)malloc(h * w * sizeof(unsigned char));
   buf_aux = (unsigned char *)malloc(h * w * sizeof(unsigned char));
   cpu_buf = (unsigned char *)malloc(h * w * sizeof(unsigned char));
   cpu_buf_aux = (unsigned char *)malloc(h * w * sizeof(unsigned char));
+  if (buf == NULL || buf_aux == NULL || cpu_buf == NULL || cpu_buf_aux == NULL)
+  {
+    fprintf(stderr, "Error: unable to allocate image buffers.\n");
+    free(buf);
+    free(buf_aux);
+    free(cpu_buf);
+    free(cpu_buf_aux);
+    free(r.data);
+    return 1;
+  }
 
   /* Storing the 'r.data' image in 'buf': */
   memcpy(buf, r.data, h * w * sizeof(unsigned char));
@@ -526,6 +577,7 @@ int main(int argc, char *argv[])
         }
       }
     }
+    results_match = same;
     printf((same ? " Ok!\n" : "\n -> Ko! \n"));
 
     printf("Total CPU time: %g second(s) \tNb convolutions/s : %g\n",
@@ -547,6 +599,7 @@ int main(int argc, char *argv[])
   free(buf_aux);
   free(cpu_buf);
   free(cpu_buf_aux);
+  free(r.data);
 
-  return 0;
+  return results_match ? 0 : 1;
 }

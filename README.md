@@ -24,6 +24,7 @@ communications, and GPU computation.
   source code relies on Unix/POSIX interfaces).
 - GNU Make and a C compiler.
 - For MPI: an MPI implementation providing `mpicc` and `mpirun`.
+- For the MPI integration tests: Python 3 (standard library only).
 - For CUDA: the CUDA toolkit (`nvcc`), a compatible NVIDIA GPU, and a suitable
   driver. The CUDA Makefile targets the `sm_60` architecture.
 
@@ -106,3 +107,27 @@ make -C GPU_parallelization clean
 
 These targets remove the executables and generated results from the relevant
 directories.
+
+## Tests
+
+Run the CPU unit tests from the project root:
+
+```sh
+make test
+```
+
+Run the MPI integration tests (requires MPI and Python 3):
+
+```sh
+make test-mpi
+```
+
+The unit tests cover all five CPU filters, convolution border behavior, and
+command-line number parsing. The MPI integration tests generate a small
+temporary Sun Raster image, then compare both MPI implementations against a
+reference result for every filter. The tests do not modify the sample images
+or leave generated test images in the repository. The MPI integration tests
+are also run by GitHub Actions on pushes and pull requests. CUDA correctness
+checking is performed by the GPU executable at runtime; automated CUDA tests
+require access to a compatible NVIDIA GPU and are not part of the standard
+CI job.
