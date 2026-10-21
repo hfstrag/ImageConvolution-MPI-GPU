@@ -22,7 +22,6 @@ int main(int argc, char *argv[]) {
   int    p;		/* number of processes */
   int    up, down;	/* ranks of the neighbors above and below */
   int    nbl;		/* number of lines per process */
-  int    first, last;	/* lines given to convolution() */
   int    dims[2];	/* h and w sent by process 0 */
   unsigned char *local;	/* my lines + 2 ghost lines */
 
@@ -87,10 +86,6 @@ int main(int argc, char *argv[]) {
   up   = (my_rank == 0)     ? MPI_PROC_NULL : my_rank - 1;
   down = (my_rank == p - 1) ? MPI_PROC_NULL : my_rank + 1;
 
-  /* The first and last lines of the image are not computed */
-  first = (my_rank == 0)     ? 1   : 0;
-  last  = (my_rank == p - 1) ? nbl : nbl + 1;
-
   /* Start of timing */
   start = my_gettimeofday();
 
@@ -108,7 +103,15 @@ int main(int argc, char *argv[]) {
                  local, w, MPI_UNSIGNED_CHAR, up, 0,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    convolution( filter, local + first * w, last - first + 1, w);
+    /* Duplicate boundary rows for the processes on the image edges. */
+    if (up == MPI_PROC_NULL) {
+      memcpy(local, local + w, w);
+    }
+    if (down == MPI_PROC_NULL) {
+      memcpy(local + (nbl + 1) * w, local + nbl * w, w);
+    }
+
+    convolution(filter, local, nbl + 2, w);
   } /* for i */
 
   /* Gathering of the lines */
