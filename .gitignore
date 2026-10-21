@@ -1,0 +1,27 @@
+# Compiled programs and object files
+*.o
+*.obj
+*.out
+parallel_blocking
+parallelnon_blocking
+gpu_convol_v0
+
+# CUDA build and profiling artifacts
+*.cubin
+*.fatbin
+*.ptx
+*.prof
+*.nsys-rep
+*.ncu-rep
+
+# Generated images and benchmark output
+post-convolution_*.ras
+MPI_parallelization/results/
+GPU_parallelization/results/
+
+# IDE and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
