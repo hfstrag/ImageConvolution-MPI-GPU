@@ -133,8 +133,6 @@ The unit tests cover all five CPU filters, convolution border behavior, and
 command-line number parsing. The MPI integration tests generate a small
 temporary Sun Raster image, then compare both MPI implementations against a
 reference result for every filter. The tests do not modify the sample images
-or leave generated test images in the repository. The MPI integration tests
-are also run by GitHub Actions on pushes and pull requests. CUDA correctness
-checking is performed by the GPU executable at runtime; automated CUDA tests
-require access to a compatible NVIDIA GPU and are not part of the standard
-CI job.
+or leave generated test images in the repository. CUDA correctness checking
+is performed by the GPU executable at runtime; there are no automated CUDA
+tests.
